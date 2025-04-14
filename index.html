@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TV Sale & Bill App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: auto;
+      background: #f4f4f4;
+    }
+    input, select, button {
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 10px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    h2, h3 {
+      color: #333;
+    }
+    #message {
+      color: green;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>TV Sale Record</h2>
+
+  <input type="text" id="customerName" placeholder="Customer Name">
+  <input type="text" id="serialNumber" placeholder="Serial Number">
+
+  <select id="modelSelect">
+    <option value="">-- Select Model --</option>
+  </select>
+  <input type="text" id="newModelInput" placeholder="Or enter new TV model">
+  <button onclick="addNewModel()">+ Save New Model</button>
+
+  <button onclick="addSale()">Generate Bill & Save</button>
+  <p id="message"></p>
+
+  <hr>
+
+  <h3>Search Sale</h3>
+  <input type="text" id="searchSerial" placeholder="Enter Serial Number">
+  <button onclick="searchSale()">Search</button>
+  <div id="searchResult"></div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBk1nM3mxmzGQLujguCoNfNegZ49CEg8lQ",
+      authDomain: "tvsale-468ea.firebaseapp.com",
+      projectId: "tvsale-468ea",
+      storageBucket: "tvsale-468ea.firebasestorage.app",
+      messagingSenderId: "39621283204",
+      appId: "1:39621283204:web:36e863ae469372a32e21d1"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function loadModels() {
+      const modelSelect = document.getElementById('modelSelect');
+      modelSelect.innerHTML = '<option value="">-- Select Model --</option>';
+      const snapshot = await db.collection('models').orderBy('model').get();
+      snapshot.forEach(doc => {
+        const opt = document.createElement('option');
+        opt.value = doc.data().model;
+        opt.textContent = doc.data().model;
+        modelSelect.appendChild(opt);
+      });
+    }
+
+    async function addNewModel() {
+      const newModel = document.getElementById('newModelInput').value.trim();
+      if (!newModel) return;
+      await db.collection('models').doc(newModel).set({ model: newModel });
+      document.getElementById('newModelInput').value = '';
+      await loadModels();
+    }
+
+    async function addSale() {
+      const name = document.getElementById('customerName').value.trim();
+      const serial = document.getElementById('serialNumber').value.trim();
+      const model = document.getElementById('modelSelect').value.trim();
+      const message = document.getElementById('message');
+
+      if (!name || !serial || !model) {
+        message.textContent = 'Please fill all fields.';
+        return;
+      }
+
+      try {
+        await db.collection('sales').doc(serial).set({
+          customerName: name,
+          serialNumber: serial,
+          model: model,
+          dateOfSale: new Date().toISOString()
+        });
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text("TV Purchase Bill", 20, 20);
+        doc.setFontSize(12);
+        doc.text(`Customer: ${name}`, 20, 40);
+        doc.text(`Serial: ${serial}`, 20, 50);
+        doc.text(`Model: ${model}`, 20, 60);
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70);
+        const pdfBlob = doc.output("blob");
+const pdfUrl = URL.createObjectURL(pdfBlob);
+window.open(pdfUrl, '_blank');
+
+        message.textContent = 'Bill generated and sale saved!';
+        document.getElementById('customerName').value = '';
+        document.getElementById('serialNumber').value = '';
+        document.getElementById('modelSelect').value = '';
+      } catch (err) {
+        console.error(err);
+        message.textContent = 'Error saving sale.';
+      }
+    }
+
+    async function searchSale() {
+      const serial = document.getElementById('searchSerial').value.trim();
+      const resultDiv = document.getElementById('searchResult');
+
+      if (!serial) return;
+
+      try {
+        const doc = await db.collection('sales').doc(serial).get();
+        if (!doc.exists) {
+          resultDiv.innerHTML = `<p>No record found.</p>`;
+        } else {
+          const data = doc.data();
+          resultDiv.innerHTML = `
+            <p><strong>Customer:</strong> ${data.customerName}</p>
+            <p><strong>Serial:</strong> ${data.serialNumber}</p>
+            <p><strong>Model:</strong> ${data.model}</p>
+            <p><strong>Date:</strong> ${new Date(data.dateOfSale).toLocaleDateString()}</p>
+          `;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = `<p>Error fetching sale.</p>`;
+      }
+    }
+
+    // Load models on page load
+    window.onload = loadModels;
+  </script>
+
+</body>
+</html>
