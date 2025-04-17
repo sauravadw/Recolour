@@ -175,110 +175,110 @@ let items = [];
 let fuse; // Declare fuse for search
 
 async function addSale() {
-const name = document.getElementById('customerName').value.trim();
-const amount = items.reduce((sum, item) => sum + item.amount, 0);
-const message = document.getElementById('message');
+  const name = document.getElementById('customerName').value.trim();
+  const amount = items.reduce((sum, item) => sum + item.amount, 0);
+  const message = document.getElementById('message');
 
-if (!name || items.length === 0) {
-message.textContent = 'Please fill all fields and add items.';
-return;
+  if (!name || items.length === 0) {
+    message.textContent = 'Please fill all fields and add items.';
+    return;
+  }
+
+  try {
+    // Run a Firestore transaction safely
+    const currentInvoice = await db.runTransaction(async (transaction) => {
+      const counterRef = db.collection('meta').doc('counters');
+      const counterSnap = await transaction.get(counterRef);
+
+      let invoiceNumber = 1; // Default to 1 if the document doesn't exist
+
+      if (counterSnap.exists) {
+        invoiceNumber = counterSnap.data().invoiceNumber + 1;
+        transaction.update(counterRef, {
+          invoiceNumber: firebase.firestore.FieldValue.increment(1),
+        });
+      } else {
+        transaction.set(counterRef, { invoiceNumber: 1 });
+      }
+
+      return invoiceNumber;
+    });
+
+    // Prepare bill data
+    const docData = {
+      invoiceNumber: currentInvoice,
+      customerName: name,
+      customerNameLower: name.toLowerCase(),
+      dateOfSale: firebase.firestore.Timestamp.now(),
+      items,
+      totalAmount: amount,
+    };
+
+    // Save the sale record
+    await db.collection('sales').add(docData);
+
+    // Generate PDF
+    generatePDF(name, new Date(), items, amount, currentInvoice);
+
+    message.textContent = 'Bill generated and saved!';
+    resetForm();
+    loadRecentBills();
+  } catch (err) {
+    console.error(err);
+    message.textContent = 'Error saving sale.';
+  }
 }
+  async function saveOnly() {
+  const name = document.getElementById('customerName').value.trim();
+  const saleDate = document.getElementById('saleDate').value;
+  const amount = items.reduce((sum, item) => sum + item.amount, 0);
+  const message = document.getElementById('message');
 
-try {
-// Run a transaction to safely update the invoice number
-await db.runTransaction(async (transaction) => {
-const counterRef = db.collection('meta').doc('counters');
-let currentInvoice = 1;
+  if (!name || items.length === 0 || !saleDate) {
+    message.textContent = 'Please fill all fields and add items.';
+    return;
+  }
 
-const counterSnap = await counterRef.get();
-if (counterSnap.exists) {
-  await counterRef.update({
-    invoiceNumber: firebase.firestore.FieldValue.increment(1)
-  });
-  currentInvoice = counterSnap.data().invoiceNumber + 1;
-} else {
-  await counterRef.set({ invoiceNumber: 1 });
-  currentInvoice = 1;
+  try {
+    // Run a Firestore transaction safely
+    const newInvoiceNumber = await db.runTransaction(async (transaction) => {
+      const counterRef = db.collection('meta').doc('counters');
+      const counterSnap = await transaction.get(counterRef);
+
+      let invoiceNumber = 1; // Default to 1 if the document doesn't exist
+
+      if (counterSnap.exists) {
+        invoiceNumber = counterSnap.data().invoiceNumber + 1;
+        transaction.update(counterRef, {
+          invoiceNumber: firebase.firestore.FieldValue.increment(1),
+        });
+      } else {
+        transaction.set(counterRef, { invoiceNumber: 1 });
+      }
+
+      return invoiceNumber;
+    });
+
+    // Prepare bill data
+    const docData = {
+      customerName: name,
+      customerNameLower: name.toLowerCase(),
+      dateOfSale: firebase.firestore.Timestamp.fromDate(new Date(saleDate)),
+      items,
+      totalAmount: amount,
+      invoiceNumber: newInvoiceNumber,
+    };
+
+    await db.collection('sales').add(docData);
+
+    message.textContent = 'Bill saved successfully (PDF not generated).';
+    resetForm();
+    loadRecentBills();
+  } catch (err) {
+    console.error(err);
+    message.textContent = 'Error saving sale.';
+  }
 }
-
-// Prepare bill data
-const docData = {
-  invoiceNumber: currentInvoice,
-  customerName: name,
-  customerNameLower: name.toLowerCase(),
-  dateOfSale: firebase.firestore.Timestamp.now(),
-  items,
-  totalAmount: amount
-};
-
-// Save the sale record
-await db.collection('sales').add(docData);
-
-// Generate PDF
-generatePDF(name, new Date(), items, amount, currentInvoice);
-
-});
-
-message.textContent = 'Bill generated and saved!';
-document.getElementById('customerName').value = '';
-document.getElementById('serialSingle').value = '';
-document.getElementById('modelSelect').value = '';
-document.getElementById('saleDate').valueAsDate = new Date();
-document.getElementById('amountSingle').value = '';
-items = [];
-updateItemList();
-loadRecentBills();
-
-} catch (err) {
-console.error(err);
-message.textContent = 'Error saving sale.';
-}
-}
-async function saveOnly() {
-const name = document.getElementById('customerName').value.trim();
-const saleDate = document.getElementById('saleDate').value;
-const amount = items.reduce((sum, item) => sum + item.amount, 0);
-const message = document.getElementById('message');
-
-if (!name || items.length === 0 || !saleDate) {
-message.textContent = 'Please fill all fields and add items.';
-return;
-}
-
-try {
-// Get latest invoice number
-const lastSale = await db.collection('sales').orderBy('invoiceNumber', 'desc').limit(1).get();
-const lastInvoice = lastSale.empty ? 0 : (lastSale.docs[0].data().invoiceNumber || 0);
-const newInvoiceNumber = lastInvoice + 1;
-
-const docData = {
-customerName: name,
-customerNameLower: name.toLowerCase(),
-dateOfSale: firebase.firestore.Timestamp.fromDate(new Date(saleDate)),
-items,
-totalAmount: amount,
-invoiceNumber: newInvoiceNumber
-};
-
-await db.collection('sales').add(docData);
-
-message.textContent = 'Bill saved successfully (PDF not generated).';
-resetForm();
-document.getElementById('customerName').value = '';
-document.getElementById('serialSingle').value = '';
-document.getElementById('modelSelect').value = '';
-document.getElementById('saleDate').valueAsDate = new Date();
-document.getElementById('amountSingle').value = '';
-items = [];
-updateItemList();
-loadRecentBills();
-} catch (err) {
-console.error(err);
-message.textContent = 'Error saving sale.';
-}
-}
-
-
 function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', customerAddress = '', customerPhone = '') {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
