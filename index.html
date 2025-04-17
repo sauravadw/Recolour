@@ -1,162 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>TV Sale & Bill App</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
-<style>
-body {
-font-family: 'Segoe UI', sans-serif;
-background-color: #f9f9f9;
-margin: 0;
-padding: 16px;
-max-width: 600px;
-margin: auto;
-}
+  <meta charset="UTF-8" />
+  <title>TV Sale & Bill App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* General Styling */
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-h2, h3, h4 {
-margin-top: 1.2em;
-color: #333;
-}
+    .container {
+      padding: 16px;
+      max-width: 600px;
+      margin: auto;
+    }
 
-input, select, button {
-width: 100%;
-padding: 10px 12px;
-margin-bottom: 12px;
-font-size: 16px;
-border-radius: 8px;
-border: 1px solid #ccc;
-box-sizing: border-box;
-}
+    h2, h3, h4 {
+      font-weight: 700;
+      color: #2c3e50;
+      margin: 16px 0;
+    }
 
-button {
-background-color: #007bff;
-color: white;
-border: none;
-transition: background-color 0.3s ease;
-}
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 16px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      outline: none;
+      box-sizing: border-box;
+    }
 
-button:hover {
-background-color: #0056b3;
-}
+    /* Buttons Styling */
+    button {
+      background: linear-gradient(135deg, #6c5ce7, #74b9ff);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
 
-.button-group {
-display: flex;
-gap: 8px;
-}
+    button:hover {
+      background: linear-gradient(135deg, #4a47a3, #54a0ff);
+    }
 
-.item-box {
-background-color: white;
-border: 1px solid #ddd;
-padding: 12px;
-border-radius: 10px;
-margin-bottom: 10px;
-box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
+    /* Card Styling */
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
 
-.item-box button {
-margin-top: 8px;
-background-color: #dc3545;
-}
+    .card h4 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      color: #34495e;
+    }
 
-.item-box button:hover {
-background-color: #a82832;
-}
+    .card p {
+      margin: 0;
+      font-size: 14px;
+      color: #7f8c8d;
+    }
 
-#recentBills ul, #searchResult ul {
-padding-left: 0;
-list-style: none;
-}
+    /* Section Headers */
+    .section-header {
+      font-size: 18px;
+      font-weight: 500;
+      color: #2c3e50;
+      margin-bottom: 8px;
+    }
 
-#recentBills li, #searchResult li {
-background: white;
-padding: 12px;
-border-radius: 10px;
-margin-bottom: 10px;
-border: 1px solid #e0e0e0;
-box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
+    /* Input Group with Icon */
+    .input-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-#message {
-color: green;
-font-weight: bold;
-margin-top: 10px;
-}
+    .input-group input {
+      flex: 1;
+      font-size: 14px;
+    }
 
-@media (min-width: 480px) {
-.button-group {
-justify-content: space-between;
-}
+    .input-group button {
+      padding: 8px;
+      background-color: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-.button-group button {
-width: 48%;
-}
-}
-</style>
+    .input-group button img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 480px) {
+      input, select, button {
+        font-size: 14px;
+        padding: 10px;
+      }
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <h2>TV Sale Tracker</h2>
 
-<h2>TV Sale Record</h2>
+    <!-- Customer Info -->
+    <div class="card">
+      <h4>Customer Details</h4>
+      <input type="text" id="customerName" placeholder="Customer Name" />
+      <input type="date" id="saleDate" />
+    </div>
 
-<input type="text" id="customerName" placeholder="Customer Name" />
-<input type="date" id="saleDate" />
+    <!-- Add Item -->
+    <div class="card">
+      <h4>Add Item</h4>
+      <input type="text" id="modelSelect" placeholder="Enter or Search Model" list="modelList" />
+      <datalist id="modelList"></datalist>
 
-<hr />
-<h3>Add Item</h3>
+      <div class="input-group">
+        <input id="serialSingle" type="text" placeholder="Serial Number" />
+        <button onclick="launchCameraScan()" title="Scan with Camera">
+          <img src="https://img.icons8.com/ios-filled/50/cccccc/camera.png" alt="Scan" />
+        </button>
+      </div>
 
-<input type="text" id="modelSelect" placeholder="Enter or Search Model" list="modelList" />
-<datalist id="modelList"></datalist>
+      <input type="number" id="amountSingle" placeholder="Amount" min="0" />
+      <button onclick="addItemToBill()">+ Add Item</button>
+    </div>
 
-<div style="display: flex; align-items: center; width: 100%; max-width: 100%;">
-  <input 
-    id="serialSingle" 
-    type="text" 
-    placeholder="Serial Number" 
-    style="flex-grow: 1; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; min-width: 0;" 
-  />
-  <button 
-    onclick="launchCameraScan()" 
-    title="Scan with Camera" 
-    style="margin-left: 8px; padding: 6px; border: none; background: none; cursor: pointer;"
-  >
-    <img 
-      src="https://img.icons8.com/ios-filled/24/000000/camera.png" 
-      alt="Camera" 
-      style="width: 24px; height: 24px;"
-    />
-  </button>
-</div>
+    <!-- Item List -->
+    <div class="card" id="itemList">
+      <h4>Items</h4>
+      <p>No items added yet.</p>
+    </div>
 
+    <!-- Action Buttons -->
+    <div class="card">
+      <button onclick="addSale()">Generate & Save</button>
+      <button onclick="saveOnly()">Save Only</button>
+    </div>
 
+    <!-- Search -->
+    <div class="card">
+      <h4>Search</h4>
+      <input type="text" id="searchInput" placeholder="Search by Customer, Model, or Serial" />
+      <button onclick="searchSale()">Search</button>
+    </div>
 
-<input type="number" id="amountSingle" placeholder="Amount" min="0" />
-<button onclick="addItemToBill()">+ Add Item</button>
+    <!-- Recent Bills -->
+    <div class="card" id="recentBills">
+      <h4>Last 10 Bills</h4>
+      <p>No recent bills found.</p>
+    </div>
+  </div>
 
-<div id="itemList"></div>
-
-<div class="button-group">
-<button onclick="addSale()">Generate & Save</button>
-<button onclick="saveOnly()">Save Only</button>
-</div>
-
-<p id="message"></p>
-
-<hr />
-<h3>Search</h3>
-<!-- Added Search input here -->
-<input type="text" id="searchInput" placeholder="Search by Customer, Model or Serial" />
-<!-- Load Data button -->
-<button id="searchDataButton" onclick="searchSale()">Load Data & Search</button>
-<div id="searchResult"></div>
-
-<h4>Last 10 Bills</h4>
-<div id="recentBills"></div>
-<input id="modelInput" type="text" list="modelSuggestions">
-<datalist id="modelSuggestions"></datalist>
 <script>
 // Firebase Initialization
 const firebaseConfig = {
@@ -628,6 +643,5 @@ loadRecentBills();
 document.getElementById('saleDate').valueAsDate = new Date();
 };
 </script>
-
 </body>
 </html>
