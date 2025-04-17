@@ -169,7 +169,8 @@
     <div class="card">
       <h4>Search</h4>
       <input type="text" id="searchInput" placeholder="Search by Customer, Model, or Serial" />
-      <button onclick="searchSale()">Search</button>
+      <button id="searchDataButton" onclick="searchSale()">Load Data & Search</button>
+	  <div id="searchResult"></div>
     </div>
 
     <!-- Recent Bills -->
@@ -305,98 +306,113 @@ function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', cu
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
-  const leftX = 20;
-  const rightX = 190;
+  // Colors and Layout Variables
+  const primaryColor = [47, 128, 237]; // Blue
+  const secondaryColor = [34, 34, 34]; // Dark Gray
+  const lightGray = [240, 240, 240]; // Light Gray for background
+  const margin = 20;
+  const rowHeight = 8; // Height for each row in the table
+
   let y = 20;
 
-  // Store Name (you can also add logo if needed)
-  doc.setFontSize(20);
+  // Add a Light Background Box for the Header
+  doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
+  doc.rect(0, 0, 210, 40, 'F'); // Full-width header background
+
+  // Header Section
   doc.setFont('helvetica', 'bold');
-  doc.text("MY TV SALES STORE", 105, y, { align: 'center' });
-
-  y += 10;
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.text("123 Market Road, Cityname, PIN 123456", 105, y, { align: 'center' });
-  y += 6;
-  doc.text("Contact: +91-9876543210 | Email: sales@tvstore.com", 105, y, { align: 'center' });
-
-  y += 10;
-  doc.setLineWidth(0.5);
-  doc.line(leftX, y, rightX, y);
-
-  y += 10;
-
-  // Invoice & Customer Info
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Invoice #: ${invoiceNumber}`, leftX, y);
-  doc.text(`Date: ${saleDate.toLocaleDateString()}`, rightX, y, { align: 'right' });
+  doc.setFontSize(22);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("INVOICE", margin, y);
 
   y += 8;
-  doc.text(`Customer: ${name}`, leftX, y);
-  y += 6;
-  if (customerAddress) doc.text(`Address: ${customerAddress}`, leftX, y);
-  y += 6;
-  if (customerPhone) doc.text(`Phone: ${customerPhone}`, leftX, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text("MY TV SALES STORE", margin, y);
+  doc.text("123 Market Road, Cityname, PIN 123456", margin, y + 5);
+  doc.text("Contact: +91-9876543210 | Email: sales@tvstore.com", margin, y + 10);
 
-  y += 10;
+  // Invoice Info Section
+  y += 20;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(`Invoice #: ${invoiceNumber}`, margin, y);
+  doc.text(`Date: ${saleDate.toLocaleDateString()}`, 210 - margin, y, { align: 'right' });
 
-// Table Headers
-const rowHeight = 10;
-
-doc.setFont('helvetica', 'bold');
-doc.setFontSize(12);
-doc.setFillColor(230, 230, 230); // light gray background
-doc.rect(leftX, y, 170, rowHeight, 'F');
-
-const headerYOffset = y + 7;
-doc.text("S.No", leftX + 2, headerYOffset);
-doc.text("Model", leftX + 20, headerYOffset);
-doc.text("Serial No.", leftX + 85, headerYOffset);
-doc.text("Amount", leftX + 165, headerYOffset, { align: 'right' });
-
-y += rowHeight + 5; // extra padding after header
-
-
-doc.setFont('helvetica', 'normal');
-doc.setFontSize(11); // consistent font size
-
-// Table Items
-items.forEach((item, index) => {
-  doc.text(`${index + 1}`, leftX + 2, y);
-  doc.text(item.model, leftX + 20, y);
-  doc.text(item.serialNumber, leftX + 85, y);
-  doc.text(`${item.amount.toFixed(2)}`, leftX + 165, y, { align: 'right' }); // align right at edge
   y += 8;
-});
+  doc.text(`Customer Name: ${name}`, margin, y);
+  y += 6;
+  if (customerAddress) doc.text(`Address: ${customerAddress}`, margin, y);
+  y += 6;
+  if (customerPhone) doc.text(`Phone: ${customerPhone}`, margin, y);
 
+  // Table Header
+  y += 10;
+  const tableStartY = y;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Blue Background
+  doc.setTextColor(255, 255, 255); // White Text
+  doc.rect(margin, y, 170, 10, 'F'); // Table Header Background
 
+  doc.text("S.No", margin + 2, y + 7);
+  doc.text("Model", margin + 20, y + 7);
+  doc.text("Serial No.", margin + 85, y + 7);
+  doc.text("Amount", 210 - margin - 10, y + 7, { align: 'right' });
+
+  // Table Rows
+  y += 16; // Add proper spacing between the header and the first row
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+
+  items.forEach((item, index) => {
+    // Check if the row will fit on the page. If not, add a new page.
+    if (y + rowHeight > 280) {
+      doc.addPage();
+      y = margin; // Reset y for the new page
+    }
+
+    doc.text(`${index + 1}`, margin + 2, y);
+    doc.text(item.model, margin + 20, y);
+    doc.text(item.serialNumber, margin + 85, y);
+    doc.text(`${item.amount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
+    y += rowHeight; // Increment y for the next row
+  });
+
+  // Total Section
   y += 5;
-doc.line(leftX, y, rightX, y); // total separator line
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
+  doc.line(margin, y, 210 - margin, y); // Separator Line
 
-y += 10;
-doc.setFont('helvetica', 'bold');
-doc.setFontSize(12);
-doc.text("Total Amount", leftX + 100, y);
-doc.text(`${totalAmount.toFixed(2)}`, leftX + 165, y, { align: 'right' });
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("Total Amount:", 210 - margin - 40, y, { align: 'right' });
+  doc.text(`${totalAmount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
 
-
+  // Footer Section
   y += 20;
   doc.setFont('helvetica', 'italic');
+  doc.setFontSize(10);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.text("Thank you for your purchase!", 105, y, { align: 'center' });
 
-  y += 30;
-  doc.setDrawColor(100);
-  doc.line(leftX + 120, y, 190, y);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text("Authorized Signature", leftX + 120, y + 5);
+  // Add Footer Line
+  y += 10;
+  doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
+  doc.line(margin, y, 210 - margin, y);
 
-  // ✅ OPEN PDF in new window
+  y += 5;
+  doc.setFontSize(8);
+  doc.text("This invoice was generated electronically and is valid without a signature.", 105, y, { align: 'center' });
+
+  // Open PDF in a new window
   doc.output('dataurlnewwindow');
 }
-
 async function addItemToBill() {
   const model = document.getElementById('modelSelect').value.trim(); // Fixed ID
   const serial = document.getElementById('serialSingle').value.trim();
@@ -493,60 +509,68 @@ recentDiv.innerHTML = '<p>Error loading recent bills.</p>';
 
 
 async function searchSale() {
-const query = document.getElementById('searchInput').value.trim().toLowerCase();
-const resultDiv = document.getElementById('searchResult');
-resultDiv.innerHTML = '';
-if (!query) return;
+  const query = document.getElementById('searchInput').value.trim().toLowerCase();
+  const resultDiv = document.getElementById('searchResult');
+  resultDiv.innerHTML = ''; // Clear previous results
 
-try {
-const snapshot = await db.collection('sales').get();
-const allSales = [];
+  if (!query) {
+    resultDiv.innerHTML = '<p>Please enter a search query.</p>';
+    return;
+  }
 
-snapshot.forEach(doc => {
-allSales.push({ id: doc.id, ...doc.data() });
-});
+  try {
+    // Fetch all sales data from Firestore
+    const snapshot = await db.collection('sales').get();
+    const allSales = [];
 
-// Prepare data for fuzzy search
-const fuse = new Fuse(allSales, {
-keys: [
-'customerNameLower',
-'items.model',
-'items.serialNumber',
-'invoiceNumber' // Include invoice number in the search
-],
-threshold: 0.4 // 0.0 = exact match, 1.0 = everything matches
-});
+    snapshot.forEach(doc => {
+      allSales.push({ id: doc.id, ...doc.data() });
+    });
 
-const fuzzyResults = fuse.search(query).map(res => res.item);
+    // Initialize Fuse.js for fuzzy searching
+    const fuse = new Fuse(allSales, {
+      keys: [
+        'customerNameLower',  // Search by customer name (lowercased)
+        'items.model',        // Search by item model
+        'items.serialNumber', // Search by serial number
+        'invoiceNumber'       // Search by invoice number
+      ],
+      threshold: 0.4 // Controls search sensitivity (0.0 = exact match, 1.0 = very loose)
+    });
 
-if (fuzzyResults.length === 0) {
-resultDiv.innerHTML = '<p>No matching records found.</p>';
-return;
-}
+    // Perform search
+    const fuzzyResults = fuse.search(query).map(res => res.item);
 
-fuzzyResults.sort((a, b) => b.dateOfSale.toDate().getTime() - a.dateOfSale.toDate().getTime());
+    if (fuzzyResults.length === 0) {
+      resultDiv.innerHTML = '<p>No matching records found.</p>';
+      return;
+    }
 
-let html = '<ul style="list-style: none; padding: 0;">';
-fuzzyResults.forEach(data => {
-const date = data.dateOfSale.toDate();
-html += `
-<li style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc;">
-<strong>${data.customerName}</strong><br>
-Invoice Number: ${data.invoiceNumber}<br> <!-- Display invoice number -->
-Date: ${date.toLocaleDateString()}<br>
-Total: ${data.totalAmount}<br>
-<button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount})'>View PDF</button>
-<button onclick='editBill("${data.id}")'>Edit Bill</button> <!-- Edit Button -->
-</li>
-`;
-});
-html += '</ul>';
-resultDiv.innerHTML = html;
+    // Sort results by date of sale (most recent first)
+    fuzzyResults.sort((a, b) => b.dateOfSale.toDate().getTime() - a.dateOfSale.toDate().getTime());
 
-} catch (err) {
-console.error(err);
-resultDiv.innerHTML = '<p>Error during search.</p>';
-}
+    // Generate result HTML
+    let html = '<ul style="list-style: none; padding: 0;">';
+    fuzzyResults.forEach(data => {
+      const date = data.dateOfSale.toDate();
+      html += `
+        <li style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc;">
+          <strong>${data.customerName}</strong><br>
+          Invoice Number: ${data.invoiceNumber}<br> <!-- Display invoice number -->
+          Date: ${date.toLocaleDateString()}<br>
+          Total: ${data.totalAmount}<br>
+          <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
+          <button onclick='editBill("${data.id}")'>Edit Bill</button> <!-- Edit Button -->
+        </li>
+      `;
+    });
+    html += '</ul>';
+    resultDiv.innerHTML = html;
+
+  } catch (err) {
+    console.error(err);
+    resultDiv.innerHTML = '<p>Error during search.</p>';
+  }
 }
 
 // Function to open the bill in editable form
