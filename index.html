@@ -1,171 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>TV Sale & Bill App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      max-width: 500px;
-      margin: auto;
-      background: #f4f4f4;
-    }
-    input, select, button {
-      width: 100%;
-      margin-bottom: 12px;
-      padding: 10px;
-      font-size: 16px;
-    }
-    button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    h2, h3 {
-      color: #333;
-    }
-    #message {
-      color: green;
-      margin-bottom: 10px;
-    }
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; background: #f4f4f4; }
+    input, select, button { width: 100%; margin-bottom: 12px; padding: 10px; font-size: 16px; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    .item-box { background: #fff; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+    ul { padding-left: 0; list-style: none; }
   </style>
 </head>
 <body>
 
-  <h2>TV Sale Record</h2>
+<h2>TV Sale Record</h2>
 
-  <input type="text" id="customerName" placeholder="Customer Name">
-  <input type="text" id="serialNumber" placeholder="Serial Number">
+<input type="text" id="customerName" placeholder="Customer Name" />
+<input type="date" id="saleDate" />
+<hr />
 
-  <select id="modelSelect">
-    <option value="">-- Select Model --</option>
-  </select>
-  <input type="text" id="newModelInput" placeholder="Or enter new TV model">
-  <button onclick="addNewModel()">+ Save New Model</button>
+<h3>Add Item</h3>
+<select id="modelSelect"></select>
+<input type="text" id="serialSingle" placeholder="Serial Number" />
+<input type="number" id="amountSingle" placeholder="Amount (₹)" min="0" />
+<button onclick="addItemToBill()">+ Add Item</button>
 
-  <button onclick="addSale()">Generate Bill & Save</button>
-  <p id="message"></p>
+<div id="itemList"></div>
+<button onclick="addSale()">Generate Bill & Save</button>
+<p id="message"></p>
 
-  <hr>
+<hr />
+<h3>Search</h3>
+<input type="text" id="searchInput" placeholder="Search Customer, Model, or Serial" />
+<button id="searchDataButton" onclick="searchSale()">Load Data & Search</button>
+<div id="searchResult"></div>
 
-  <h3>Search Sale</h3>
-  <input type="text" id="searchSerial" placeholder="Enter Serial Number">
-  <button onclick="searchSale()">Search</button>
-  <div id="searchResult"></div>
+<h4>Last 10 Bills</h4>
+<div id="recentBills"></div>
 
-  <script>
-    // Firebase Config
-    const firebaseConfig = {
-      apiKey: "AIzaSyBk1nM3mxmzGQLujguCoNfNegZ49CEg8lQ",
-      authDomain: "tvsale-468ea.firebaseapp.com",
-      projectId: "tvsale-468ea",
-      storageBucket: "tvsale-468ea.firebasestorage.app",
-      messagingSenderId: "39621283204",
-      appId: "1:39621283204:web:36e863ae469372a32e21d1"
+<script>
+  // Firebase Initialization
+  const firebaseConfig = {
+    apiKey: "AIzaSyBk1nM3mxmzGQLujguCoNfNegZ49CEg8lQ",
+    authDomain: "tvsale-468ea.firebaseapp.com",
+    projectId: "tvsale-468ea",
+    storageBucket: "tvsale-468ea.appspot.com",
+    messagingSenderId: "39621283204",
+    appId: "1:39621283204:web:36e863ae469372a32e21d1"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  let items = [];
+  let fuse;  // Declare fuse for search
+
+  async function addSale() {
+    const name = document.getElementById('customerName').value.trim();
+    const saleDate = document.getElementById('saleDate').value;
+    const amount = items.reduce((sum, item) => sum + item.amount, 0);
+    const message = document.getElementById('message');
+
+    if (!name || items.length === 0 || !saleDate) {
+      message.textContent = 'Please fill all fields and add items.';
+      return;
+    }
+
+    const docData = {
+      customerName: name,
+      customerNameLower: name.toLowerCase(),
+      dateOfSale: firebase.firestore.Timestamp.fromDate(new Date(saleDate)),
+      items,
+      totalAmount: amount
     };
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    try {
+      await db.collection('sales').add(docData);
+      generatePDF(name, new Date(saleDate), items, amount);
 
-    async function loadModels() {
-      const modelSelect = document.getElementById('modelSelect');
-      modelSelect.innerHTML = '<option value="">-- Select Model --</option>';
-      const snapshot = await db.collection('models').orderBy('model').get();
-      snapshot.forEach(doc => {
-        const opt = document.createElement('option');
-        opt.value = doc.data().model;
-        opt.textContent = doc.data().model;
-        modelSelect.appendChild(opt);
-      });
+      message.textContent = 'Bill generated and saved!';
+      document.getElementById('customerName').value = '';
+      document.getElementById('serialSingle').value = '';
+      document.getElementById('modelSelect').value = '';
+      document.getElementById('saleDate').valueAsDate = new Date();
+      document.getElementById('amountSingle').value = '';
+      items = [];
+
+      loadRecentBills(); // Refresh last 10 bills
+    } catch (err) {
+      console.error(err);
+      message.textContent = 'Error saving sale.';
+    }
+  }
+
+  function generatePDF(name, saleDate, items, totalAmount) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("TV Purchase Bill", 20, 20);
+    doc.setFontSize(12);
+    doc.text(`Customer: ${name}`, 20, 40);
+    doc.text(`Date: ${saleDate.toLocaleDateString()}`, 20, 50);
+
+    let y = 60;
+    items.forEach((item, idx) => {
+      doc.text(`Item ${idx + 1}:`, 20, y);
+      y += 10;
+      doc.text(`Model: ${item.model}`, 30, y);
+      y += 10;
+      doc.text(`Serial: ${item.serialNumber}`, 30, y);
+      y += 10;
+      doc.text(`Amount: ₹${item.amount.toFixed(2)}`, 30, y);
+      y += 10;
+    });
+
+    doc.text(`Total Amount: ₹${totalAmount.toFixed(2)}`, 20, y + 10);
+    doc.output('dataurlnewwindow');
+  }
+
+  function addItemToBill() {
+    const model = document.getElementById('modelSelect').value;
+    const serial = document.getElementById('serialSingle').value.trim();
+    const amount = parseFloat(document.getElementById('amountSingle').value);
+
+    if (!model || !serial || isNaN(amount)) {
+      alert('Please fill in all item fields correctly.');
+      return;
     }
 
-    async function addNewModel() {
-      const newModel = document.getElementById('newModelInput').value.trim();
-      if (!newModel) return;
-      await db.collection('models').doc(newModel).set({ model: newModel });
-      document.getElementById('newModelInput').value = '';
-      await loadModels();
-    }
+    items.push({
+      model,
+      serialNumber: serial,
+      amount
+    });
 
-    async function addSale() {
-      const name = document.getElementById('customerName').value.trim();
-      const serial = document.getElementById('serialNumber').value.trim();
-      const model = document.getElementById('modelSelect').value.trim();
-      const message = document.getElementById('message');
+    document.getElementById('modelSelect').value = '';
+    document.getElementById('serialSingle').value = '';
+    document.getElementById('amountSingle').value = '';
+    updateItemList();
+  }
 
-      if (!name || !serial || !model) {
-        message.textContent = 'Please fill all fields.';
+  function updateItemList() {
+    const itemListDiv = document.getElementById('itemList');
+    itemListDiv.innerHTML = '';
+
+    items.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.classList.add('item-box');
+      div.innerHTML = ` 
+        <strong>${item.model}</strong> - ${item.serialNumber} - ₹${item.amount.toFixed(2)}
+        <button onclick="removeItem(${idx})">Remove</button>
+      `;
+      itemListDiv.appendChild(div);
+    });
+  }
+
+  function removeItem(idx) {
+    items.splice(idx, 1);
+    updateItemList();
+  }
+
+  async function loadRecentBills() {
+    const recentDiv = document.getElementById('recentBills');
+    recentDiv.innerHTML = '<p>Loading...</p>';
+
+    try {
+      const snapshot = await db.collection('sales')
+        .orderBy('dateOfSale', 'desc')
+        .limit(10)
+        .get();
+
+      if (snapshot.empty) {
+        recentDiv.innerHTML = '<p>No recent bills found.</p>';
         return;
       }
 
-      try {
-        await db.collection('sales').doc(serial).set({
-          customerName: name,
-          serialNumber: serial,
-          model: model,
-          dateOfSale: new Date().toISOString()
-        });
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        doc.setFontSize(16);
-        doc.text("TV Purchase Bill", 20, 20);
-        doc.setFontSize(12);
-        doc.text(`Customer: ${name}`, 20, 40);
-        doc.text(`Serial: ${serial}`, 20, 50);
-        doc.text(`Model: ${model}`, 20, 60);
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70);
-        const pdfBlob = doc.output("blob");
-const pdfUrl = URL.createObjectURL(pdfBlob);
-window.open(pdfUrl, '_blank');
-
-        message.textContent = 'Bill generated and sale saved!';
-        document.getElementById('customerName').value = '';
-        document.getElementById('serialNumber').value = '';
-        document.getElementById('modelSelect').value = '';
-      } catch (err) {
-        console.error(err);
-        message.textContent = 'Error saving sale.';
-      }
+      let html = '<ul style="list-style: none; padding: 0;">';
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const date = data.dateOfSale.toDate();
+        html += `
+          <li style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc;">
+            <strong>${data.customerName}</strong><br>
+            Date: ${date.toLocaleDateString()}<br>
+            Total: ₹${data.totalAmount}<br>
+            <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount})'>View PDF</button>
+          </li>
+        `;
+      });
+      html += '</ul>';
+      recentDiv.innerHTML = html;
+    } catch (err) {
+      console.error(err);
+      recentDiv.innerHTML = '<p>Error loading recent bills.</p>';
     }
+  }
 
-    async function searchSale() {
-      const serial = document.getElementById('searchSerial').value.trim();
-      const resultDiv = document.getElementById('searchResult');
+  async function searchSale() {
+    const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    const resultDiv = document.getElementById('searchResult');
+    resultDiv.innerHTML = '';
+    if (!query) return;
 
-      if (!serial) return;
+    try {
+      const snapshot = await db.collection('sales').get();
+      const allSales = [];
 
-      try {
-        const doc = await db.collection('sales').doc(serial).get();
-        if (!doc.exists) {
-          resultDiv.innerHTML = `<p>No record found.</p>`;
-        } else {
-          const data = doc.data();
-          resultDiv.innerHTML = `
-            <p><strong>Customer:</strong> ${data.customerName}</p>
-            <p><strong>Serial:</strong> ${data.serialNumber}</p>
-            <p><strong>Model:</strong> ${data.model}</p>
-            <p><strong>Date:</strong> ${new Date(data.dateOfSale).toLocaleDateString()}</p>
-          `;
-        }
-      } catch (err) {
-        resultDiv.innerHTML = `<p>Error fetching sale.</p>`;
+      snapshot.forEach(doc => {
+        allSales.push({ id: doc.id, ...doc.data() });
+      });
+
+      // Prepare data for fuzzy search
+      fuse = new Fuse(allSales, {
+        keys: [
+          'customerNameLower',
+          'items.model',
+          'items.serialNumber'
+        ],
+        threshold: 0.4 // 0.0 = exact match, 1.0 = everything matches
+      });
+
+      const fuzzyResults = fuse.search(query).map(res => res.item);
+
+      if (fuzzyResults.length === 0) {
+        resultDiv.innerHTML = '<p>No matching records found.</p>';
+        return;
       }
-    }
 
-    // Load models on page load
-    window.onload = loadModels;
-  </script>
+      fuzzyResults.sort((a, b) => b.dateOfSale.toDate().getTime() - a.dateOfSale.toDate().getTime());
+
+      let html = '<ul style="list-style: none; padding: 0;">';
+      fuzzyResults.forEach(data => {
+        const date = data.dateOfSale.toDate();
+        html += `
+          <li style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc;">
+            <strong>${data.customerName}</strong><br>
+            Date: ${date.toLocaleDateString()}<br>
+            Total: ₹${data.totalAmount}<br>
+            <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount})'>View PDF</button>
+          </li>
+        `;
+      });
+      html += '</ul>';
+      resultDiv.innerHTML = html;
+
+    } catch (err) {
+      console.error(err);
+      resultDiv.innerHTML = '<p>Error during search.</p>';
+    }
+  }
+
+  async function loadModels() {
+    const modelSelect = document.getElementById('modelSelect');
+    modelSelect.innerHTML = '<option value="">-- Select Model --</option>';
+    const snapshot = await db.collection('models').orderBy('model').get();
+    snapshot.forEach(doc => {
+      const opt = document.createElement('option');
+      opt.value = doc.data().model;
+      opt.textContent = doc.data().model;
+      modelSelect.appendChild(opt);
+    });
+  }
+
+  window.onload = () => {
+    loadModels();
+    loadRecentBills();
+    document.getElementById('saleDate').valueAsDate = new Date();
+  };
+</script>
 
 </body>
 </html>
