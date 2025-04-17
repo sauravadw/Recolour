@@ -88,30 +88,33 @@
 
     /* Input Group with Icon */
     .input-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-    .input-group input {
-      flex: 1;
-      font-size: 14px;
-    }
+.input-group input {
+  flex: 1; /* Allow the input to take up remaining space */
+  font-size: 14px;
+}
 
-    .input-group button {
-      padding: 8px;
-      background-color: white;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+.input-group button {
+  flex-shrink: 0; /* Prevent button from shrinking */
+  width: 40px; /* Fixed width for the button */
+  height: 40px; /* Fixed height for the button */
+  padding: 8px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-    .input-group button img {
-      width: 20px;
-      height: 20px;
-    }
+.input-group button img {
+  width: 20px;
+  height: 20px;
+}
 
     /* Responsive Adjustments */
     @media (max-width: 480px) {
