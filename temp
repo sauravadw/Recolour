@@ -1,0 +1,92 @@
+
+To align the buttons ("Generate and Save" and "Save Only", as well as "View PDF" and "Edit Bill") side by side, here’s a detailed breakdown of where and how you need to make the changes in the `index.html` file.
+
+---
+
+### 1. **Changes for "Generate and Save" and "Save Only" Buttons**
+These buttons are located in the "Action Buttons" section starting at **line 162**.
+
+#### Current Code:
+```html
+<div class="card">
+  <button onclick="addSale()">Generate & Save</button>
+  <button onclick="saveOnly()">Save Only</button>
+</div>
+```
+
+#### Updated Code:
+To align these buttons side by side:
+- Add a `button-container` class to the `<div>` wrapping the buttons.
+- Update the CSS to use `flexbox` for horizontal alignment.
+
+##### Updated HTML:
+```html
+<div class="card button-container">
+  <button onclick="addSale()">Generate & Save</button>
+  <button onclick="saveOnly()">Save Only</button>
+</div>
+```
+
+##### CSS:
+Add this CSS rule inside the `<style>` section:
+```css
+.button-container {
+  display: flex;
+  gap: 10px; /* Adds spacing between buttons */
+}
+
+.card.button-container button {
+  width: auto; /* Allow buttons to size dynamically */
+  flex: 1; /* Optional: Adjust to ensure even spacing and size */
+}
+```
+
+---
+
+### 2. **Changes for "View PDF" and "Edit Bill" Buttons**
+These buttons are dynamically created in the `loadRecentBills()` function (starting around **line 471**).
+
+#### Current Dynamic Button Generation Code:
+```javascript
+html += `
+  <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
+  <button onclick='editBill("${doc.id}")'>Edit Bill</button>
+`;
+```
+
+#### Updated Code:
+To align the buttons horizontally:
+- Wrap the buttons with a `<div>` using a `button-container` class.
+- This ensures the same `flexbox` styling is applied as above.
+
+##### Updated JavaScript Code:
+```javascript
+html += `
+  <div class="button-container">
+    <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
+    <button onclick='editBill("${doc.id}")'>Edit Bill</button>
+  </div>
+`;
+```
+
+##### CSS:
+The same `button-container` style from above will apply to these buttons automatically.
+
+---
+
+### 3. **Optional: Add Global Spacing Between All Buttons**
+If you want consistent spacing across all buttons in the app, you can add this to your CSS:
+```css
+button {
+  margin: 5px; /* Adds consistent spacing around all buttons */
+}
+```
+
+---
+
+### Final Steps:
+1. Save the changes to the `index.html` file.
+2. Reload the app in a browser to verify that the buttons are aligned side by side.
+3. Adjust the `gap` value in the CSS if you need more or less space between the buttons.
+
+Let me know if you encounter any issues or need further assistance!
