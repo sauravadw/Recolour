@@ -132,10 +132,86 @@
   width: auto; /* Allow buttons to size dynamically */
   flex: 1; /* Optional: Adjust to ensure even spacing and size */
 }
+/* Styling for Recent Bills Section */
+/* Styling for Recent Bills Section */
+.recent-bills-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* Space between cards */
+  padding: 8px;
+}
+
+.recent-bill-card {
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  font-size: 14px; /* Compact font size */
+}
+
+.recent-bill-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+}
+
+.recent-bill-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.recent-bill-header .customer-name {
+  font-size: 16px;
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.recent-bill-header .invoice-number,
+.recent-bill-header .total-amount {
+  font-size: 14px;
+  color: #7f8c8d;
+}
+
+.recent-bill-details {
+  font-size: 14px;
+  color: #34495e;
+  margin-top: 4px;
+}
+
+.recent-bill-models {
+  color: #7f8c8d;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.recent-bill-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.recent-bill-actions button {
+  background: linear-gradient(135deg, #6c5ce7, #74b9ff);
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.recent-bill-actions button:hover {
+  background: linear-gradient(135deg, #4a47a3, #54a0ff);
+}
   </style>
 </head>
 <body>
   <div class="container">
+  <div id="message" class="message"></div>
     <h2>TV Sale Tracker</h2>
 
     <!-- Customer Info -->
@@ -150,14 +226,16 @@
       <h4>Add Item</h4>
       <input type="text" id="modelSelect" placeholder="Enter or Search Model" list="modelList" />
       <datalist id="modelList"></datalist>
-
+	  
+		<input type="number" id="quantitySingle" placeholder="Quantity" min="1" value="1" />
+		
       <div class="input-group">
-        <input id="serialSingle" type="text" placeholder="Serial Number" />
+		<input id="serialMultiple" type="text" placeholder="Enter Serial Numbers (comma or newline-separated)" />
         <button onclick="launchCameraScan()" title="Scan with Camera">
           <img src="https://img.icons8.com/ios-filled/50/cccccc/camera.png" alt="Scan" />
         </button>
       </div>
-
+	  
       <input type="number" id="amountSingle" placeholder="Amount" min="0" />
       <button onclick="addItemToBill()">+ Add Item</button>
     </div>
@@ -184,9 +262,11 @@
 
     <!-- Recent Bills -->
     <div class="card" id="recentBills">
-      <h4>Last 10 Bills</h4>
-      <p>No recent bills found.</p>
-    </div>
+  <h4>Last 10 Bills</h4>
+  <div id="recentBillsContainer" class="recent-bills-container">
+    <p>Loading...</p> <!-- Placeholder for loading -->
+  </div>
+</div>
   </div>
 
 <script>
@@ -377,18 +457,18 @@ function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', cu
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
 
   items.forEach((item, index) => {
-    // Check if the row will fit on the page. If not, add a new page.
-    if (y + rowHeight > 280) {
-      doc.addPage();
-      y = margin; // Reset y for the new page
-    }
+  if (y + rowHeight > 280) {
+    doc.addPage();
+    y = margin; // Reset y for the new page
+  }
 
-    doc.text(`${index + 1}`, margin + 2, y);
-    doc.text(item.model, margin + 20, y);
-    doc.text(item.serialNumber, margin + 85, y);
-    doc.text(`${item.amount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
-    y += rowHeight; // Increment y for the next row
-  });
+  doc.text(`${index + 1}`, margin + 2, y);
+  doc.text(item.model, margin + 20, y);
+  doc.text(`Qty: ${item.quantity}`, margin + 60, y); // Display quantity
+  doc.text(item.serialNumbers.join(', '), margin + 100, y); // Display all serial numbers
+  doc.text(`${item.amount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
+  y += rowHeight;
+});
 
   // Total Section
   y += 5;
@@ -423,37 +503,39 @@ function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', cu
   doc.output('dataurlnewwindow');
 }
 async function addItemToBill() {
-  const model = document.getElementById('modelSelect').value.trim(); // Fixed ID
-  const serial = document.getElementById('serialSingle').value.trim();
+  const model = document.getElementById('modelSelect').value.trim();
+  const serialInput = document.getElementById('serialMultiple').value.trim(); // Updated to use textarea
   const amount = parseFloat(document.getElementById('amountSingle').value);
+  const quantity = parseInt(document.getElementById('quantitySingle').value, 10); // New field
 
-  if (!model || !serial || isNaN(amount)) {
+  if (!model || !serialInput || isNaN(amount) || isNaN(quantity) || quantity <= 0) {
     alert('Please fill in all item fields correctly.');
     return;
   }
 
-  if (!modelList.includes(model)) {
-    try {
-      await db.collection('models').add({ model });
-      modelList.push(model);
-      const option = document.createElement('option');
-      option.value = model;
-      document.getElementById('modelList').appendChild(option); // Fixed ID
-      console.log(`New model "${model}" added to Firestore.`);
-    } catch (err) {
-      console.error("Error adding new model:", err);
-    }
+  // Split serial numbers by comma or newline
+  const serialNumbers = serialInput.split(/[\n,]+/).map((serial) => serial.trim()).filter((serial) => serial);
+
+  // Validate that the number of serial numbers matches the quantity
+  if (serialNumbers.length !== quantity) {
+    alert(`Please enter exactly ${quantity} serial numbers.`);
+    return;
   }
+
+  const totalPrice = amount * quantity; // Calculate total price based on quantity
 
   items.push({
     model,
-    serialNumber: serial,
-    amount
+    serialNumbers, // Save serial numbers as an array
+    amount: totalPrice,
+    quantity,
   });
 
-  document.getElementById('modelSelect').value = ''; // Fixed ID
-  document.getElementById('serialSingle').value = '';
+  // Reset fields after adding
+  document.getElementById('modelSelect').value = '';
+  document.getElementById('serialMultiple').value = '';
   document.getElementById('amountSingle').value = '';
+  document.getElementById('quantitySingle').value = '1';
   updateItemList();
 }
 
@@ -462,63 +544,73 @@ items.splice(idx, 1);
 updateItemList();
 }
 function updateItemList() {
-const itemListDiv = document.getElementById('itemList');
-itemListDiv.innerHTML = '';
+  const itemListDiv = document.getElementById('itemList');
+  itemListDiv.innerHTML = '';
 
-items.forEach((item, idx) => {
-const div = document.createElement('div');
-div.classList.add('item-box');
-div.innerHTML = `
-<strong>${item.model}</strong> - ${item.serialNumber} - ${item.amount.toFixed(2)}
-<button onclick="removeItem(${idx})">Remove</button>
-`;
-itemListDiv.appendChild(div);
-});
+  items.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.classList.add('item-box');
+    div.innerHTML = `
+      <strong>${item.model}</strong> - ${item.serialNumbers.join(', ')} - Qty: ${item.quantity} - Price: ${item.amount.toFixed(2)}
+      <button onclick="removeItem(${idx})">Remove</button>
+    `;
+    itemListDiv.appendChild(div);
+  });
 }
-
-
 async function loadRecentBills() {
-const recentDiv = document.getElementById('recentBills');
-recentDiv.innerHTML = '<p>Loading...</p>';
+  const recentDiv = document.getElementById('recentBillsContainer');
+  recentDiv.innerHTML = '<p>Loading...</p>'; // Show loading message
 
-try {
-// Get the last 10 bills ordered by invoice number
-const snapshot = await db.collection('sales')
-.orderBy('invoiceNumber', 'desc') // Sort by invoiceNumber instead of date
-.limit(10)
-.get();
+  try {
+    // Get the last 10 bills ordered by invoice number
+    const snapshot = await db.collection('sales')
+      .orderBy('invoiceNumber', 'desc')
+      .limit(10)
+      .get();
 
-if (snapshot.empty) {
-recentDiv.innerHTML = '<p>No recent bills found.</p>';
-return;
-}
+    if (snapshot.empty) {
+      recentDiv.innerHTML = '<p>No recent bills found.</p>';
+      return;
+    }
 
-let html = '<ul style="list-style: none; padding: 0;">';
+    // Clear loading message
+    recentDiv.innerHTML = '';
+
 snapshot.forEach(doc => {
-const data = doc.data();
-const date = data.dateOfSale.toDate();
-html += `
-<li style="margin-bottom: 10px; padding: 10px; background: #fff; border-radius: 5px; border: 1px solid #ccc;">
-<strong>Invoice #${data.invoiceNumber}</strong><br>
-<strong>${data.customerName}</strong><br>
-Date: ${date.toLocaleDateString()}<br>
-Total: ${data.totalAmount}<br>
-<div class="button-container">
-    <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
-    <button onclick='editBill("${doc.id}")'>Edit Bill</button>
-  </div>
-</li>
-`;
+  const data = doc.data();
+  const date = data.dateOfSale.toDate();
+
+  // Extract models with quantities
+  const models = data.items.map(item => `${item.model} (Qty: ${item.quantity})`).join(', ');
+
+  // Create a card for each bill
+  const card = document.createElement('div');
+  card.classList.add('recent-bill-card');
+
+  card.innerHTML = `
+    <div class="recent-bill-header">
+      <span class="customer-name">${data.customerName}</span>
+      <div>
+        <span class="invoice-number">#${data.invoiceNumber}</span> | 
+        <span class="total-amount">₹${data.totalAmount.toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="recent-bill-models">
+      <strong>Models:</strong> ${models}
+    </div>
+    <div class="recent-bill-actions">
+      <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
+      <button onclick='editBill("${doc.id}")'>Edit Bill</button>
+    </div>
+  `;
+
+  recentDiv.appendChild(card);
 });
-html += '</ul>';
-recentDiv.innerHTML = html;
-} catch (err) {
-console.error(err);
-recentDiv.innerHTML = '<p>Error loading recent bills.</p>';
+  } catch (err) {
+    console.error(err);
+    recentDiv.innerHTML = '<p>Error loading recent bills.</p>';
+  }
 }
-}
-
-
 async function searchSale() {
   const query = document.getElementById('searchInput').value.trim().toLowerCase();
   const resultDiv = document.getElementById('searchResult');
@@ -647,11 +739,11 @@ function resetForm() {
   document.getElementById('serialSingle').value = '';
   document.getElementById('modelInput').value = '';
   document.getElementById('amountSingle').value = '';
+  document.getElementById('quantitySingle').value = '1'; // Reset quantity field
   items = [];
   updateItemList();
   document.getElementById('message').textContent = '';
 }
-
 function launchCameraScan() {
   const userAgent = navigator.userAgent.toLowerCase();
 
