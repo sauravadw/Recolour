@@ -793,29 +793,30 @@ async function shareBillOnWhatsApp() {
 
     // Generate WhatsApp message
     const billText = `
-*INVOICE*
+*🧾 INVOICE 🧾*
 ---------------------------
-*Store:* MY TV SALES STORE
-*Address:* 123 Market Road, Cityname, PIN 123456
-*Contact:* +91-9876543210 | Email: sales@tvstore.com
+*🏬 Store:* MY TV SALES STORE
+📍 *Address:* 123 Market Road, Cityname, PIN 123456
+📞 *Contact:* +91-9876543210
+✉ *Email:* sales@tvstore.com
 
-*Invoice #:* ${newInvoiceNumber}
-*Date:* ${new Date(date).toLocaleDateString()}
+*📜 Invoice #:* ${newInvoiceNumber}
+*📅 Date:* ${new Date(date).toLocaleDateString()}
 
-*Customer Name:* ${name}
+*👤 Customer Name:* ${name}
 
-*Items:*
+*🛒 Items Purchased:*
 ${items.map((item, index) => `
   ${index + 1}. *Model:* ${item.model}
-     *Qty:* ${item.quantity}
-     *Serial No:* ${item.serialNumbers.join(", ")}
-     *Price:* ₹${item.amount.toFixed(2)}
+     ➡ *Qty:* ${item.quantity}
+     ➡ *Serial No:* ${item.serialNumbers.join(", ")}
+     ➡ *Price:* ₹${item.amount.toFixed(2)}
 `).join("")}
 
 ---------------------------
-*Total Amount:* ₹${totalAmount.toFixed(2)}
+💰 *Total Amount:* ₹${totalAmount.toFixed(2)}
 
-_Thank you for your purchase!_
+_✨ Thank you for your purchase! ✨_
 _This invoice was generated electronically and is valid without a signature._
 `;
 
