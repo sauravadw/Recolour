@@ -123,6 +123,15 @@
         padding: 10px;
       }
     }
+	.button-container {
+  display: flex;
+  gap: 10px; /* Adds spacing between buttons */
+}
+
+.card.button-container button {
+  width: auto; /* Allow buttons to size dynamically */
+  flex: 1; /* Optional: Adjust to ensure even spacing and size */
+}
   </style>
 </head>
 <body>
@@ -160,10 +169,10 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="card">
-      <button onclick="addSale()">Generate & Save</button>
-      <button onclick="saveOnly()">Save Only</button>
-    </div>
+    <div class="card button-container">
+  <button onclick="addSale()">Generate & Save</button>
+  <button onclick="saveOnly()">Save Only</button>
+</div>
 
     <!-- Search -->
     <div class="card">
@@ -494,8 +503,10 @@ html += `
 <strong>${data.customerName}</strong><br>
 Date: ${date.toLocaleDateString()}<br>
 Total: ${data.totalAmount}<br>
-<button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
-<button onclick='editBill("${doc.id}")'>Edit Bill</button> <!-- Edit button added -->
+<div class="button-container">
+    <button onclick='generatePDF("${data.customerName}", new Date("${date.toISOString()}"), ${JSON.stringify(data.items).replace(/"/g, '&quot;')}, ${data.totalAmount}, ${data.invoiceNumber})'>View PDF</button>
+    <button onclick='editBill("${doc.id}")'>Edit Bill</button>
+  </div>
 </li>
 `;
 });
