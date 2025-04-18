@@ -215,11 +215,13 @@
     <h2>TV Sale Tracker</h2>
 
     <!-- Customer Info -->
-    <div class="card">
-      <h4>Customer Details</h4>
-      <input type="text" id="customerName" placeholder="Customer Name" />
-      <input type="date" id="saleDate" />
-    </div>
+	
+	<div class="card">
+  <h4>Customer Details</h4>
+  <input type="text" id="customerName" placeholder="Customer Name" />
+  <input type="date" id="saleDate" />
+  <input type="tel" id="customerMobile" placeholder="Customer Mobile Number (e.g., +919876543210)" />
+</div>
 
     <!-- Add Item -->
     <div class="card">
@@ -247,9 +249,11 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="card button-container">
+	
+	<div class="card button-container">
   <button onclick="addSale()">Generate & Save</button>
   <button onclick="saveOnly()">Save Only</button>
+  <button onclick="shareBillOnWhatsApp()">Share via WhatsApp</button>
 </div>
 
     <!-- Search -->
@@ -288,22 +292,27 @@ let fuse; // Declare fuse for search
 
 async function addSale() {
   const name = document.getElementById('customerName').value.trim();
+  const mobile = document.getElementById('customerMobile').value.trim();
   const amount = items.reduce((sum, item) => sum + item.amount, 0);
   const message = document.getElementById('message');
 
-  if (!name || items.length === 0) {
+  if (!name || !mobile || items.length === 0) {
     message.textContent = 'Please fill all fields and add items.';
     return;
   }
 
+  // Validate mobile number format
+  if (!/^\+\d{10,15}$/.test(mobile)) {
+    message.textContent = 'Please enter a valid mobile number with country code (e.g., +919876543210).';
+    return;
+  }
+
   try {
-    // Run a Firestore transaction safely
     const currentInvoice = await db.runTransaction(async (transaction) => {
       const counterRef = db.collection('meta').doc('counters');
       const counterSnap = await transaction.get(counterRef);
 
-      let invoiceNumber = 1; // Default to 1 if the document doesn't exist
-
+      let invoiceNumber = 1;
       if (counterSnap.exists) {
         invoiceNumber = counterSnap.data().invoiceNumber + 1;
         transaction.update(counterRef, {
@@ -320,6 +329,7 @@ async function addSale() {
     const docData = {
       invoiceNumber: currentInvoice,
       customerName: name,
+      customerMobile: mobile,
       customerNameLower: name.toLowerCase(),
       dateOfSale: firebase.firestore.Timestamp.now(),
       items,
@@ -330,7 +340,7 @@ async function addSale() {
     await db.collection('sales').add(docData);
 
     // Generate PDF
-    generatePDF(name, new Date(), items, amount, currentInvoice);
+    generatePDF(name, new Date(), items, amount, currentInvoice, '', mobile);
 
     message.textContent = 'Bill generated and saved!';
     resetForm();
@@ -391,24 +401,20 @@ async function addSale() {
     message.textContent = 'Error saving sale.';
   }
 }
-function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', customerAddress = '', customerPhone = '') {
+function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', customerAddress = '', customerMobile = '') {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
   // Colors and Layout Variables
-  const primaryColor = [47, 128, 237]; // Blue
-  const secondaryColor = [34, 34, 34]; // Dark Gray
-  const lightGray = [240, 240, 240]; // Light Gray for background
+  const primaryColor = [47, 128, 237];
+  const secondaryColor = [34, 34, 34];
+  const lightGray = [240, 240, 240];
   const margin = 20;
-  const rowHeight = 8; // Height for each row in the table
+  const rowHeight = 8;
 
   let y = 20;
 
-  // Add a Light Background Box for the Header
-  doc.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.rect(0, 0, 210, 40, 'F'); // Full-width header background
-
-  // Header Section
+  // Add Header Section
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -434,52 +440,45 @@ function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', cu
   y += 6;
   if (customerAddress) doc.text(`Address: ${customerAddress}`, margin, y);
   y += 6;
-  if (customerPhone) doc.text(`Phone: ${customerPhone}`, margin, y);
+  if (customerMobile) doc.text(`Mobile: ${customerMobile}`, margin, y);
 
-  // Table Header
+  // Table Header and Items
   y += 10;
-  const tableStartY = y;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]); // Blue Background
-  doc.setTextColor(255, 255, 255); // White Text
-  doc.rect(margin, y, 170, 10, 'F'); // Table Header Background
-
+  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.setTextColor(255, 255, 255);
+  doc.rect(margin, y, 170, 10, 'F');
   doc.text("S.No", margin + 2, y + 7);
   doc.text("Model", margin + 20, y + 7);
   doc.text("Serial No.", margin + 85, y + 7);
   doc.text("Amount", 210 - margin - 10, y + 7, { align: 'right' });
 
-  // Table Rows
-  y += 16; // Add proper spacing between the header and the first row
+  y += 16;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
 
   items.forEach((item, index) => {
-  if (y + rowHeight > 280) {
-    doc.addPage();
-    y = margin; // Reset y for the new page
-  }
+    if (y + rowHeight > 280) {
+      doc.addPage();
+      y = margin;
+    }
 
-  doc.text(`${index + 1}`, margin + 2, y);
-  doc.text(item.model, margin + 20, y);
-  doc.text(`Qty: ${item.quantity}`, margin + 60, y); // Display quantity
-  doc.text(item.serialNumbers.join(', '), margin + 100, y); // Display all serial numbers
-  doc.text(`${item.amount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
-  y += rowHeight;
-});
+    doc.text(`${index + 1}`, margin + 2, y);
+    doc.text(item.model, margin + 20, y);
+    doc.text(`Qty: ${item.quantity}`, margin + 60, y);
+    doc.text(item.serialNumbers.join(', '), margin + 100, y);
+    doc.text(`${item.amount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
+    y += rowHeight;
+  });
 
-  // Total Section
+  // Total Amount Section
   y += 5;
-  doc.setLineWidth(0.5);
-  doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.line(margin, y, 210 - margin, y); // Separator Line
-
+  doc.line(margin, y, 210 - margin, y);
   y += 10;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
   doc.text("Total Amount:", 210 - margin - 40, y, { align: 'right' });
   doc.text(`${totalAmount.toFixed(2)}`, 210 - margin - 10, y, { align: 'right' });
 
@@ -487,19 +486,8 @@ function generatePDF(name, saleDate, items, totalAmount, invoiceNumber = '-', cu
   y += 20;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(10);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   doc.text("Thank you for your purchase!", 105, y, { align: 'center' });
 
-  // Add Footer Line
-  y += 10;
-  doc.setDrawColor(lightGray[0], lightGray[1], lightGray[2]);
-  doc.line(margin, y, 210 - margin, y);
-
-  y += 5;
-  doc.setFontSize(8);
-  doc.text("This invoice was generated electronically and is valid without a signature.", 105, y, { align: 'center' });
-
-  // Open PDF in a new window
   doc.output('dataurlnewwindow');
 }
 async function addItemToBill() {
@@ -754,7 +742,57 @@ function launchCameraScan() {
     alert("Camera scan is only supported on Android using Google Lens. Please manually enter the serial number.");
   }
 }
+function shareBillOnWhatsApp() {
+  const name = document.getElementById('customerName').value.trim();
+  const mobile = document.getElementById('customerMobile').value.trim();
+  const date = document.getElementById('saleDate').value;
+  const totalAmount = items.reduce((sum, item) => sum + item.amount, 0);
 
+  // Validate inputs
+  if (!name || !mobile || items.length === 0 || !date) {
+    alert("Please fill all required fields and add items to the bill.");
+    return;
+  }
+
+  // Validate mobile number (should start with a country code, e.g., '91' for India)
+  if (!/^\d{10,15}$/.test(mobile)) {
+    alert("Please enter a valid mobile number (with country code, e.g., 919876543210).");
+    return;
+  }
+
+  // Generate bill text
+  const billText = `
+    INVOICE
+    ---------------------------
+    Store: MY TV SALES STORE
+    Address: 123 Market Road, Cityname, PIN 123456
+    Contact: +91-9876543210 | Email: sales@tvstore.com
+
+    Invoice #: -
+    Date: ${new Date(date).toLocaleDateString()}
+
+    Customer Name: ${name}
+    Items:
+    ${items.map((item, index) => `
+      ${index + 1}. Model: ${item.model} - Qty: ${item.quantity} - Serial No: ${item.serialNumbers.join(", ")} - ₹${item.amount.toFixed(2)}
+    `).join("\n")}
+
+    ---------------------------
+    Total Amount: ₹${totalAmount.toFixed(2)}
+
+    Thank you for your purchase!
+    This invoice was generated electronically and is valid without a signature.
+  `;
+
+  // Encode the message for URL
+  const encodedMessage = encodeURIComponent(billText);
+
+  // Create WhatsApp URL
+  const whatsappUrl = `https://wa.me/${mobile}?text=${encodedMessage}`;
+
+  // Open WhatsApp chat in a new tab
+  window.open(whatsappUrl, '_blank');
+}
 async function loadModels() {
   const modelInput = document.getElementById('modelSelect'); // Fixed ID
   const dataList = document.getElementById('modelList');     // Fixed ID
